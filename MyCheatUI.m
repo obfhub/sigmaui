@@ -58,7 +58,6 @@ static float gSpeed = 1.0f;
     [self buildLogoButton];
     [self buildPanel];
 
-    // IMPORTANT: start with panel OFF
     self.panel.hidden = YES;
     self.panel.alpha = 0.0;
 }
@@ -73,12 +72,19 @@ static float gSpeed = 1.0f;
     self.logoBtn.layer.cornerRadius = size/2;
     self.logoBtn.backgroundColor = [UIColor colorWithWhite:0.05 alpha:0.95];
 
-    // “Logo” icon (SF Symbol). You can change this to any symbol you want.
+    // SF Symbol logo (works iOS 13+)
     UIImageSymbolConfiguration *cfg =
         [UIImageSymbolConfiguration configurationWithPointSize:22 weight:UIImageSymbolWeightBold];
     UIImage *icon = [UIImage systemImageNamed:@"bolt.fill" withConfiguration:cfg];
-    [self.logoBtn setImage:icon forState:UIControlStateNormal];
-    self.logoBtn.tintColor = [UIColor colorWithRed:0.8 green:0.1 blue:0.9 alpha:1.0];
+
+    // Fallback in case symbol is nil for some reason
+    if (!icon) {
+        [self.logoBtn setTitle:@"⚡️" forState:UIControlStateNormal];
+        self.logoBtn.titleLabel.font = [UIFont systemFontOfSize:22 weight:UIFontWeightBold];
+    } else {
+        [self.logoBtn setImage:icon forState:UIControlStateNormal];
+        self.logoBtn.tintColor = [UIColor colorWithRed:0.8 green:0.1 blue:0.9 alpha:1.0];
+    }
 
     self.logoBtn.layer.borderWidth = 2.0;
     self.logoBtn.layer.borderColor = self.logoBtn.tintColor.CGColor;
@@ -88,10 +94,8 @@ static float gSpeed = 1.0f;
     self.logoBtn.layer.shadowRadius = 8;
     self.logoBtn.layer.shadowOffset = CGSizeMake(0, 4);
 
-    // tap = toggle menu on/off
     [self.logoBtn addTarget:self action:@selector(togglePanel) forControlEvents:UIControlEventTouchUpInside];
 
-    // drag gesture
     UIPanGestureRecognizer *pan =
         [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleDrag:)];
     [self.logoBtn addGestureRecognizer:pan];
@@ -211,7 +215,6 @@ static float gSpeed = 1.0f;
 
         CGFloat left = 20 + self.logoBtn.bounds.size.width/2;
         CGFloat right = win.bounds.size.width - left;
-
         CGFloat targetX = (self.logoBtn.center.x < win.bounds.size.width/2) ? left : right;
 
         [UIView animateWithDuration:0.2 animations:^{
@@ -223,44 +226,43 @@ static float gSpeed = 1.0f;
 
 #pragma mark - Toggle handlers
 
-- (void)toggleGod:(UISwitch *)sw {
-    gGodMode = sw.isOn;
-    NSLog(@"[dylib] God Mode = %@", gGodMode ? @"ON" : @"OFF");
-}
-
-- (void)toggleWall:(UISwitch *)sw {
-    gWallhack = sw.isOn;
-    NSLog(@"[dylib] Wallhack = %@", gWallhack ? @"ON" : @"OFF");
-}
-
-- (void)toggleAim:(UISwitch *)sw {
-    gAimbot = sw.isOn;
-    NSLog(@"[dylib] Aimbot = %@", gAimbot ? @"ON" : @"OFF");
-}
-
-- (void)speedChanged:(UISlider *)sl {
-    gSpeed = sl.value;
-    NSLog(@"[dylib] Speed = %.2f", gSpeed);
-}
+- (void)toggleGod:(UISwitch *)sw { gGodMode = sw.isOn; }
+- (void)toggleWall:(UISwitch *)sw { gWallhack = sw.isOn; }
+- (void)toggleAim:(UISwitch *)sw  { gAimbot = sw.isOn; }
+- (void)speedChanged:(UISlider *)sl { gSpeed = sl.value; }
 
 @end
+
+#pragma mark - Retry presenter
+
+static void PresentOverlayWithRetry(int triesLeft) {
+    if (triesLeft <= 0) return;
+
+    UIWindow *window = FindKeyWindow();
+    UIViewController *root = window.rootViewController;
+
+    if (!window || !root) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.25 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            PresentOverlayWithRetry(triesLeft - 1);
+        });
+        return;
+    }
+
+    UIViewController *top = TopVC(root);
+
+    CheatOverlayController *overlay = [CheatOverlayController new];
+    overlay.modalPresentationStyle = UIModalPresentationOverFullScreen;
+
+    [top presentViewController:overlay animated:NO completion:nil];
+}
 
 #pragma mark - Entry point (runs when dylib loads)
 
 __attribute__((constructor))
 static void dylib_entry(void) {
     dispatch_async(dispatch_get_main_queue(), ^{
-        UIWindow *window = FindKeyWindow();
-        if (!window) return;
-
-        UIViewController *root = window.rootViewController;
-        if (!root) return;
-
-        UIViewController *top = TopVC(root);
-
-        CheatOverlayController *overlay = [CheatOverlayController new];
-        overlay.modalPresentationStyle = UIModalPresentationOverFullScreen;
-
-        [top presentViewController:overlay animated:NO completion:nil];
+        // Try for ~5 seconds total (20 * 0.25s)
+        PresentOverlayWithRetry(20);
     });
 }
