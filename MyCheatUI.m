@@ -33,7 +33,7 @@ static UIViewController *TopVC(UIViewController *root) {
     return vc;
 }
 
-#pragma mark - Example state vars (connect these to your features)
+#pragma mark - Example state vars (connect to your features)
 
 static BOOL gGodMode = NO;
 static BOOL gWallhack = NO;
@@ -43,7 +43,7 @@ static float gSpeed = 1.0f;
 #pragma mark - Overlay Controller
 
 @interface CheatOverlayController : UIViewController
-@property (nonatomic, strong) UIButton *fab;
+@property (nonatomic, strong) UIButton *logoBtn;
 @property (nonatomic, strong) UIView *panel;
 @property (nonatomic, assign) BOOL panelVisible;
 @end
@@ -55,45 +55,57 @@ static float gSpeed = 1.0f;
     self.view.backgroundColor = UIColor.clearColor;
     self.panelVisible = NO;
 
-    [self buildFloatingButton];
+    [self buildLogoButton];
     [self buildPanel];
+
+    // IMPORTANT: start with panel OFF
+    self.panel.hidden = YES;
+    self.panel.alpha = 0.0;
 }
 
 #pragma mark UI build
 
-- (void)buildFloatingButton {
-    CGFloat size = 64;
+- (void)buildLogoButton {
+    CGFloat size = 58;
 
-    self.fab = [UIButton buttonWithType:UIButtonTypeCustom];
-    self.fab.frame = CGRectMake(40, 120, size, size);
-    self.fab.layer.cornerRadius = size/2;
-    self.fab.backgroundColor = [UIColor colorWithRed:0.8 green:0.1 blue:0.9 alpha:0.95];
+    self.logoBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    self.logoBtn.frame = CGRectMake(30, 130, size, size);
+    self.logoBtn.layer.cornerRadius = size/2;
+    self.logoBtn.backgroundColor = [UIColor colorWithWhite:0.05 alpha:0.95];
 
-    [self.fab setTitle:@"☰" forState:UIControlStateNormal];
-    self.fab.titleLabel.font = [UIFont systemFontOfSize:28 weight:UIFontWeightBold];
+    // “Logo” icon (SF Symbol). You can change this to any symbol you want.
+    UIImageSymbolConfiguration *cfg =
+        [UIImageSymbolConfiguration configurationWithPointSize:22 weight:UIImageSymbolWeightBold];
+    UIImage *icon = [UIImage systemImageNamed:@"bolt.fill" withConfiguration:cfg];
+    [self.logoBtn setImage:icon forState:UIControlStateNormal];
+    self.logoBtn.tintColor = [UIColor colorWithRed:0.8 green:0.1 blue:0.9 alpha:1.0];
 
-    self.fab.layer.shadowColor = UIColor.blackColor.CGColor;
-    self.fab.layer.shadowOpacity = 0.35;
-    self.fab.layer.shadowRadius = 8;
-    self.fab.layer.shadowOffset = CGSizeMake(0, 4);
+    self.logoBtn.layer.borderWidth = 2.0;
+    self.logoBtn.layer.borderColor = self.logoBtn.tintColor.CGColor;
 
-    [self.fab addTarget:self action:@selector(togglePanel) forControlEvents:UIControlEventTouchUpInside];
+    self.logoBtn.layer.shadowColor = UIColor.blackColor.CGColor;
+    self.logoBtn.layer.shadowOpacity = 0.35;
+    self.logoBtn.layer.shadowRadius = 8;
+    self.logoBtn.layer.shadowOffset = CGSizeMake(0, 4);
 
+    // tap = toggle menu on/off
+    [self.logoBtn addTarget:self action:@selector(togglePanel) forControlEvents:UIControlEventTouchUpInside];
+
+    // drag gesture
     UIPanGestureRecognizer *pan =
         [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleDrag:)];
-    [self.fab addGestureRecognizer:pan];
+    [self.logoBtn addGestureRecognizer:pan];
 
-    [self.view addSubview:self.fab];
+    [self.view addSubview:self.logoBtn];
 }
 
 - (void)buildPanel {
     CGFloat W = 280, H = 260;
 
     self.panel = [[UIView alloc] initWithFrame:CGRectMake(0, 0, W, H)];
-    self.panel.center = CGPointMake(self.fab.center.x + W/2 + 10, self.fab.center.y);
+    self.panel.center = CGPointMake(self.logoBtn.center.x + W/2 + 10, self.logoBtn.center.y);
     self.panel.backgroundColor = [UIColor colorWithWhite:0.08 alpha:0.98];
     self.panel.layer.cornerRadius = 16;
-    self.panel.hidden = YES;
 
     self.panel.layer.shadowColor = UIColor.blackColor.CGColor;
     self.panel.layer.shadowOpacity = 0.5;
@@ -105,6 +117,14 @@ static float gSpeed = 1.0f;
     title.textColor = UIColor.whiteColor;
     title.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
     [self.panel addSubview:title];
+
+    UIButton *close = [UIButton buttonWithType:UIButtonTypeSystem];
+    close.frame = CGRectMake(W-36, 8, 28, 28);
+    [close setTitle:@"✕" forState:UIControlStateNormal];
+    close.tintColor = UIColor.whiteColor;
+    close.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightBold];
+    [close addTarget:self action:@selector(togglePanel) forControlEvents:UIControlEventTouchUpInside];
+    [self.panel addSubview:close];
 
     UIView *line = [[UIView alloc] initWithFrame:CGRectMake(0, 42, W, 1)];
     line.backgroundColor = [UIColor colorWithWhite:1 alpha:0.08];
@@ -127,9 +147,10 @@ static float gSpeed = 1.0f;
     [slider addTarget:self action:@selector(speedChanged:) forControlEvents:UIControlEventValueChanged];
     [self.panel addSubview:slider];
 
-    sw1.onTintColor = self.fab.backgroundColor;
-    sw2.onTintColor = self.fab.backgroundColor;
-    sw3.onTintColor = self.fab.backgroundColor;
+    UIColor *accent = self.logoBtn.tintColor;
+    sw1.onTintColor = accent;
+    sw2.onTintColor = accent;
+    sw3.onTintColor = accent;
 
     [self.view addSubview:self.panel];
 }
@@ -182,20 +203,20 @@ static float gSpeed = 1.0f;
     [pan setTranslation:CGPointZero inView:self.view];
 
     CGFloat W = self.panel.bounds.size.width;
-    self.panel.center = CGPointMake(self.fab.center.x + W/2 + 10, self.fab.center.y);
+    self.panel.center = CGPointMake(self.logoBtn.center.x + W/2 + 10, self.logoBtn.center.y);
 
     if (pan.state == UIGestureRecognizerStateEnded) {
         UIWindow *win = self.view.window;
         if (!win) return;
 
-        CGFloat left = 20 + self.fab.bounds.size.width/2;
+        CGFloat left = 20 + self.logoBtn.bounds.size.width/2;
         CGFloat right = win.bounds.size.width - left;
 
-        CGFloat targetX = (self.fab.center.x < win.bounds.size.width/2) ? left : right;
+        CGFloat targetX = (self.logoBtn.center.x < win.bounds.size.width/2) ? left : right;
 
         [UIView animateWithDuration:0.2 animations:^{
-            self.fab.center = CGPointMake(targetX, self.fab.center.y);
-            self.panel.center = CGPointMake(self.fab.center.x + W/2 + 10, self.fab.center.y);
+            self.logoBtn.center = CGPointMake(targetX, self.logoBtn.center.y);
+            self.panel.center = CGPointMake(self.logoBtn.center.x + W/2 + 10, self.logoBtn.center.y);
         }];
     }
 }
