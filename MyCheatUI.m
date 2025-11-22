@@ -1,6 +1,29 @@
 #import <UIKit/UIKit.h>
 #import <CoreGraphics/CoreGraphics.h>
 
+#pragma mark - Passthrough root view (doesn't block app touches)
+
+@interface PassthroughView : UIView
+@property (nonatomic, weak) UIView *logoView;
+@property (nonatomic, weak) UIView *panelView;
+@end
+
+@implementation PassthroughView
+
+- (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
+    if (self.logoView && CGRectContainsPoint(self.logoView.frame, point)) {
+        return YES;
+    }
+    if (self.panelView && !self.panelView.hidden &&
+        CGRectContainsPoint(self.panelView.frame, point)) {
+        return YES;
+    }
+    return NO; // let touches fall through to app
+}
+
+@end
+
+
 #pragma mark - Scene-safe window + top VC (iOS 13+ / iOS 18 safe)
 
 static UIWindow *FindKeyWindow(void) {
@@ -33,12 +56,13 @@ static UIViewController *TopVC(UIViewController *root) {
     return vc;
 }
 
-#pragma mark - Example state vars (connect to your features)
+#pragma mark - Example state vars (hook these to your features)
 
 static BOOL gGodMode = NO;
 static BOOL gWallhack = NO;
 static BOOL gAimbot = NO;
 static float gSpeed = 1.0f;
+
 
 #pragma mark - Overlay Controller
 
@@ -50,16 +74,28 @@ static float gSpeed = 1.0f;
 
 @implementation CheatOverlayController
 
+// Make the controller's view passthrough
+- (void)loadView {
+    PassthroughView *v = [PassthroughView new];
+    v.backgroundColor = UIColor.clearColor;
+    self.view = v;
+}
+
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.view.backgroundColor = UIColor.clearColor;
-    self.panelVisible = NO;
 
+    self.panelVisible = NO;
     [self buildLogoButton];
     [self buildPanel];
 
+    // start with panel OFF
     self.panel.hidden = YES;
     self.panel.alpha = 0.0;
+
+    // wire passthrough targets
+    PassthroughView *pv = (PassthroughView *)self.view;
+    pv.logoView = self.logoBtn;
+    pv.panelView = self.panel;
 }
 
 #pragma mark UI build
@@ -72,15 +108,15 @@ static float gSpeed = 1.0f;
     self.logoBtn.layer.cornerRadius = size/2;
     self.logoBtn.backgroundColor = [UIColor colorWithWhite:0.05 alpha:0.95];
 
-    // SF Symbol logo (works iOS 13+)
+    // SF Symbol logo
     UIImageSymbolConfiguration *cfg =
         [UIImageSymbolConfiguration configurationWithPointSize:22 weight:UIImageSymbolWeightBold];
     UIImage *icon = [UIImage systemImageNamed:@"bolt.fill" withConfiguration:cfg];
 
-    // Fallback in case symbol is nil for some reason
     if (!icon) {
         [self.logoBtn setTitle:@"⚡️" forState:UIControlStateNormal];
         self.logoBtn.titleLabel.font = [UIFont systemFontOfSize:22 weight:UIFontWeightBold];
+        self.logoBtn.tintColor = [UIColor colorWithRed:0.8 green:0.1 blue:0.9 alpha:1.0];
     } else {
         [self.logoBtn setImage:icon forState:UIControlStateNormal];
         self.logoBtn.tintColor = [UIColor colorWithRed:0.8 green:0.1 blue:0.9 alpha:1.0];
@@ -94,8 +130,11 @@ static float gSpeed = 1.0f;
     self.logoBtn.layer.shadowRadius = 8;
     self.logoBtn.layer.shadowOffset = CGSizeMake(0, 4);
 
-    [self.logoBtn addTarget:self action:@selector(togglePanel) forControlEvents:UIControlEventTouchUpInside];
+    // tap = toggle menu
+    [self.logoBtn addTarget:self action:@selector(togglePanel)
+           forControlEvents:UIControlEventTouchUpInside];
 
+    // drag
     UIPanGestureRecognizer *pan =
         [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleDrag:)];
     [self.logoBtn addGestureRecognizer:pan];
@@ -224,16 +263,29 @@ static float gSpeed = 1.0f;
     }
 }
 
-#pragma mark - Toggle handlers
+#pragma mark - Toggle handlers (wire to your stuff)
 
-- (void)toggleGod:(UISwitch *)sw { gGodMode = sw.isOn; }
-- (void)toggleWall:(UISwitch *)sw { gWallhack = sw.isOn; }
-- (void)toggleAim:(UISwitch *)sw  { gAimbot = sw.isOn; }
-- (void)speedChanged:(UISlider *)sl { gSpeed = sl.value; }
+- (void)toggleGod:(UISwitch *)sw {
+    gGodMode = sw.isOn;
+    NSLog(@"[dylib] God Mode = %@", gGodMode ? @"ON" : @"OFF");
+}
+- (void)toggleWall:(UISwitch *)sw {
+    gWallhack = sw.isOn;
+    NSLog(@"[dylib] Wallhack = %@", gWallhack ? @"ON" : @"OFF");
+}
+- (void)toggleAim:(UISwitch *)sw {
+    gAimbot = sw.isOn;
+    NSLog(@"[dylib] Aimbot = %@", gAimbot ? @"ON" : @"OFF");
+}
+- (void)speedChanged:(UISlider *)sl {
+    gSpeed = sl.value;
+    NSLog(@"[dylib] Speed = %.2f", gSpeed);
+}
 
 @end
 
-#pragma mark - Retry presenter
+
+#pragma mark - Retry presenter (wait until app UI is ready)
 
 static void PresentOverlayWithRetry(int triesLeft) {
     if (triesLeft <= 0) return;
@@ -253,16 +305,18 @@ static void PresentOverlayWithRetry(int triesLeft) {
 
     CheatOverlayController *overlay = [CheatOverlayController new];
     overlay.modalPresentationStyle = UIModalPresentationOverFullScreen;
+    overlay.modalTransitionStyle = UIModalTransitionStyleCrossDissolve;
 
     [top presentViewController:overlay animated:NO completion:nil];
 }
+
 
 #pragma mark - Entry point (runs when dylib loads)
 
 __attribute__((constructor))
 static void dylib_entry(void) {
     dispatch_async(dispatch_get_main_queue(), ^{
-        // Try for ~5 seconds total (20 * 0.25s)
+        // Try for ~5 seconds (20 * 0.25s)
         PresentOverlayWithRetry(20);
     });
 }
