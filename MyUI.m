@@ -1,7 +1,7 @@
 #import <UIKit/UIKit.h>
 #import <CoreGraphics/CoreGraphics.h>
 
-#pragma mark - Scene-safe window + top VC (iOS 18)
+#pragma mark - Scene-safe window + top VC (iOS 13+ / iOS 18 safe)
 
 static UIWindow *FindKeyWindow(void) {
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
@@ -9,6 +9,7 @@ static UIWindow *FindKeyWindow(void) {
         if (![scene isKindOfClass:[UIWindowScene class]]) continue;
 
         UIWindowScene *ws = (UIWindowScene *)scene;
+
         for (UIWindow *w in ws.windows) {
             if (w.isKeyWindow) return w;
         }
@@ -32,7 +33,7 @@ static UIViewController *TopVC(UIViewController *root) {
     return vc;
 }
 
-#pragma mark - State you can use in your own features
+#pragma mark - Example state vars (connect these to your features)
 
 static BOOL gGodMode = NO;
 static BOOL gWallhack = NO;
@@ -62,6 +63,7 @@ static float gSpeed = 1.0f;
 
 - (void)buildFloatingButton {
     CGFloat size = 64;
+
     self.fab = [UIButton buttonWithType:UIButtonTypeCustom];
     self.fab.frame = CGRectMake(40, 120, size, size);
     self.fab.layer.cornerRadius = size/2;
@@ -77,8 +79,8 @@ static float gSpeed = 1.0f;
 
     [self.fab addTarget:self action:@selector(togglePanel) forControlEvents:UIControlEventTouchUpInside];
 
-    // drag gesture
-    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleDrag:)];
+    UIPanGestureRecognizer *pan =
+        [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleDrag:)];
     [self.fab addGestureRecognizer:pan];
 
     [self.view addSubview:self.fab];
@@ -86,6 +88,7 @@ static float gSpeed = 1.0f;
 
 - (void)buildPanel {
     CGFloat W = 280, H = 260;
+
     self.panel = [[UIView alloc] initWithFrame:CGRectMake(0, 0, W, H)];
     self.panel.center = CGPointMake(self.fab.center.x + W/2 + 10, self.fab.center.y);
     self.panel.backgroundColor = [UIColor colorWithWhite:0.08 alpha:0.98];
@@ -97,7 +100,6 @@ static float gSpeed = 1.0f;
     self.panel.layer.shadowRadius = 10;
     self.panel.layer.shadowOffset = CGSizeMake(0, 6);
 
-    // Title bar
     UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(12, 10, W-24, 24)];
     title.text = @"Arcasa Menu";
     title.textColor = UIColor.whiteColor;
@@ -108,12 +110,10 @@ static float gSpeed = 1.0f;
     line.backgroundColor = [UIColor colorWithWhite:1 alpha:0.08];
     [self.panel addSubview:line];
 
-    // Toggles
     UISwitch *sw1 = [self addToggle:@"God Mode" y:58 initial:gGodMode action:@selector(toggleGod:)];
     UISwitch *sw2 = [self addToggle:@"Wallhack" y:110 initial:gWallhack action:@selector(toggleWall:)];
     UISwitch *sw3 = [self addToggle:@"Aimbot" y:162 initial:gAimbot action:@selector(toggleAim:)];
 
-    // Speed slider
     UILabel *speedLabel = [[UILabel alloc] initWithFrame:CGRectMake(12, 210, 120, 20)];
     speedLabel.text = @"Speed";
     speedLabel.textColor = UIColor.whiteColor;
@@ -127,7 +127,6 @@ static float gSpeed = 1.0f;
     [slider addTarget:self action:@selector(speedChanged:) forControlEvents:UIControlEventValueChanged];
     [self.panel addSubview:slider];
 
-    // Make switches purple like cheat menus
     sw1.onTintColor = self.fab.backgroundColor;
     sw2.onTintColor = self.fab.backgroundColor;
     sw3.onTintColor = self.fab.backgroundColor;
@@ -182,16 +181,9 @@ static float gSpeed = 1.0f;
     pan.view.center = CGPointMake(pan.view.center.x + t.x, pan.view.center.y + t.y);
     [pan setTranslation:CGPointZero inView:self.view];
 
-    // keep panel attached to FAB
-    if (self.panelVisible) {
-        CGFloat W = self.panel.bounds.size.width;
-        self.panel.center = CGPointMake(self.fab.center.x + W/2 + 10, self.fab.center.y);
-    } else {
-        CGFloat W = self.panel.bounds.size.width;
-        self.panel.center = CGPointMake(self.fab.center.x + W/2 + 10, self.fab.center.y);
-    }
+    CGFloat W = self.panel.bounds.size.width;
+    self.panel.center = CGPointMake(self.fab.center.x + W/2 + 10, self.fab.center.y);
 
-    // snap to screen edges on end
     if (pan.state == UIGestureRecognizerStateEnded) {
         UIWindow *win = self.view.window;
         if (!win) return;
@@ -203,18 +195,16 @@ static float gSpeed = 1.0f;
 
         [UIView animateWithDuration:0.2 animations:^{
             self.fab.center = CGPointMake(targetX, self.fab.center.y);
-            CGFloat W = self.panel.bounds.size.width;
             self.panel.center = CGPointMake(self.fab.center.x + W/2 + 10, self.fab.center.y);
         }];
     }
 }
 
-#pragma mark - Toggle handlers (hook these to your features)
+#pragma mark - Toggle handlers
 
 - (void)toggleGod:(UISwitch *)sw {
     gGodMode = sw.isOn;
     NSLog(@"[dylib] God Mode = %@", gGodMode ? @"ON" : @"OFF");
-    // TODO: call your feature here
 }
 
 - (void)toggleWall:(UISwitch *)sw {
@@ -249,7 +239,6 @@ static void dylib_entry(void) {
 
         CheatOverlayController *overlay = [CheatOverlayController new];
         overlay.modalPresentationStyle = UIModalPresentationOverFullScreen;
-        overlay.modalTransitionStyle = UIModalTransitionStyleCrossDissolve;
 
         [top presentViewController:overlay animated:NO completion:nil];
     });
