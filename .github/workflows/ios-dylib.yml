@@ -1,4 +1,4 @@
-name: Build iOS dylib
+name: Build iOS dylib (arm64)
 
 on:
   push:
@@ -7,7 +7,6 @@ on:
 jobs:
   build:
     runs-on: macos-latest
-
     steps:
       - uses: actions/checkout@v4
 
@@ -16,10 +15,11 @@ jobs:
           clang -arch arm64 \
             -isysroot $(xcrun --sdk iphoneos --show-sdk-path) \
             -framework UIKit \
-            -dynamiclib MyUI.m \
+            -framework CoreGraphics \
+            -dynamiclib MyCheatUI.m \
             -o libMyUI.dylib \
             -Wl,-install_name,@rpath/libMyUI.dylib \
-            -miphoneos-version-min=12.0 \
+            -miphoneos-version-min=13.0 \
             -fobjc-arc
 
       - name: Upload artifact
