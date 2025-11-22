@@ -1,4 +1,5 @@
 #import <UIKit/UIKit.h>
+#import <CoreGraphics/CoreGraphics.h>
 
 #pragma mark - Scene-safe window + top VC (iOS 18)
 
